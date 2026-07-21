@@ -1,0 +1,281 @@
+# 4-Switch Non-Inverting Buck-Boost Converter
+### LTspice Iteration 1 — Full Project Documentation
+
+> **Project Type:** Analog IC Design Portfolio Project  
+> **Simulation Tool:** LTspice XVII (Iteration 1)  
+> **Target Process:** SKY130 (post-LTspice phase)
+
+---
+
+## Colour Legend
+
+| Symbol | Status |
+|--------|--------|
+| 🟢 | Done |
+| 🟠 | In-Progress |
+| 🟡 | Pending |
+| 🔴 | Pre-req / Theory |
+
+---
+
+## 1. Project Overview
+
+A granular, task-by-task roadmap for designing a 4-Switch Non-Inverting Buck-Boost Converter from scratch in LTspice, with a clear migration path to SKY130 ASIC implementation.
+
+### 1.1 Design Specifications
+
+| Parameter | Value |
+|-----------|-------|
+| Input Voltage (Vin) | 2.5V – 4.2V (Li-ion battery) |
+| Output Voltage (Vout) | 3.3V (fixed) |
+| Max Output Current (Iout) | 100 mA |
+| Switching Frequency (Fsw) | 500 kHz |
+| Topology | 4-Switch Non-Inverting Buck-Boost |
+| Control Method | Purely Analog – PWM Comparator + Error Amplifier feedback |
+| Target Process (Phase 2+) | SKY130 (SkyWater 130 nm) |
+| Operating Modes | Buck (Vin > Vout), Boost (Vin < Vout), Buck-Boost (Vin ≈ Vout) |
+| Inductor (calculated) | ≈ 47 µH |
+| Output Capacitor (calculated) | ≈ 1 µF |
+| Input Capacitor (calculated) | ≈ 4.7 µF |
+
+### 1.2 Operating-Mode Summary
+
+| Mode | Condition | Active Switches | Duty-Cycle Logic |
+|------|-----------|-----------------|------------------|
+| Buck | Vin > Vout + ΔV | S1+S2 switching, S3=OFF, S4=ON | D = Vout / Vin |
+| Boost | Vin < Vout − ΔV | S1=ON, S2=OFF, S3+S4 switching | D = 1 − Vin/Vout |
+| Buck-Boost | Vin ≈ Vout (±200 mV) | All 4 switches switching | Blended / overlap mode |
+
+---
+
+## 2. Hand Calculations (Power Stage Sizing)
+
+### 2.1 Duty Cycle
+
+| Condition | Vin (V) | Formula | D |
+|-----------|---------|---------|---|
+| Buck – max Vin | 4.2 | D = Vout / Vin | ≈ 0.786 |
+| Buck – min Vin | 3.3 + ε | D = Vout / Vin | ≈ 1.0 (boundary) |
+| Boost – max Vin | 3.3 − ε | D = 1 − Vin/Vout | ≈ 0 (boundary) |
+| Boost – min Vin | 2.5 | D = 1 − Vin/Vout | ≈ 0.242 |
+
+### 2.2 Inductor
+
+- Target ripple ΔIL = 30% × Iload = 30 mA (worst case at Vin = 4.2V)
+- `L = Vout × (1 − D) / (Fsw × ΔIL) = 3.3 × 0.214 / (500k × 0.03) ≈ 47 µH`
+
+### 2.3 Output Capacitor
+
+- Target output ripple ΔVout ≤ 10 mV
+- `Cout = ΔIL / (8 × Fsw × ΔVout) = 0.03 / (8 × 500k × 0.01) ≈ 750 nF → use 1 µF`
+
+### 2.4 Input Capacitor
+
+- `Cin ≈ D(1−D) × Iload / (Fsw × ΔVin) ≈ 4.7 µF` (ΔVin = 50 mV target)
+
+### 2.5 Feedback Resistor Divider
+
+- Vref = 1.2V, Vout = 3.3V
+- `R1/R2 = (Vout − Vref) / Vref = (3.3 − 1.2) / 1.2 = 1.75 → R1 = 175 kΩ, R2 = 100 kΩ`
+
+### 2.6 Type-II Compensator Zero & Pole
+
+- `fz = 1 / (2π × R1 × Cf)` — place at LC resonance / 5
+- `fp = 1 / (2π × R1 × (Cf ‖ Cp))` — place near Fsw / 2
+- `f0 = 1 / (2π × √(L × Cout)) = 1 / (2π × √(47µ × 1µ)) ≈ 23.2 kHz`
+
+---
+
+## 3. Granular Task Table
+
+> Update the **Status** column as you complete each task.
+
+### Phase 0 — Theory Refresh (Pre-requisite) 🔴
+
+| # | Task | Deliverable | Notes / Formula | Status |
+|---|------|-------------|-----------------|--------|
+| P0-1 | Review CCM vs DCM boundary for Buck converter | Hand-calc: `Lboundary = (1−D)Vout / (2×Fsw×Iout)` | At 100 mA load, confirm 47 µH stays in CCM across all Vin | 🔴 Prereq |
+| P0-2 | Review boost converter volt-second balance | Hand-calc: `Vout = Vin / (1−D)` verified | Confirm at Vin=2.5V → D=0.242 gives Vout=3.3V | 🔴 Prereq |
+| P0-3 | Understand 4-switch topology operating modes | Mode-transition diagram sketched | Hysteresis window ΔV = ±200 mV around Vout recommended | 🔴 Prereq |
+| P0-4 | Review Type-II compensator theory | Bode plot of uncompensated plant sketched | Plant = `Vout/Verror = (1+sRcCout) / (s²LCout + sCout(Rc+DCR) + 1)` | 🔴 Prereq |
+
+---
+
+### Phase 1 — Open-Loop Power Stage (Ideal Switches) 🟡
+
+| # | Task | Deliverable | Notes / Formula | Status |
+|---|------|-------------|-----------------|--------|
+| 1-1 | Build 4-switch power stage in LTspice with VSWITCH ideal switches | Schematic .asc file saved | Use SW model: Ron=10m, Roff=1MEG, Vt=0.5 | 🟡 Pending |
+| 1-2 | Add L = 47 µH inductor with DCR = 200 mΩ | Inductor parameter set in schematic | DCR models real winding resistance; important for efficiency | 🟡 Pending |
+| 1-3 | Add Cout = 1 µF with ESR = 50 mΩ | Capacitor parameter set | ESR creates output voltage ripple spike; observe it | 🟡 Pending |
+| 1-4 | Add Cin = 4.7 µF with ESR = 20 mΩ | Input cap placed at Vin node | Reduces input current ripple feeding into Vin source | 🟡 Pending |
+| 1-5 | Add dead-time logic between S1↔S2 and S3↔S4 gate signals | PWM sources with 10 ns dead-time created | Use two PULSE sources with delay offset: ton_hi ends 10 ns before ton_lo starts | 🟡 Pending |
+| 1-6 | Run BUCK mode transient: Vin=4.2V, D=0.786, Rload=33 Ω | Vout ≈ 3.3V verified, IL waveform plotted | Check ΔIL ≤ 30 mA, ΔVout ≤ 10 mV | 🟡 Pending |
+| 1-7 | Run BOOST mode transient: Vin=2.5V, D=0.242, Rload=33 Ω | Vout ≈ 3.3V verified | If Vout drifts, re-check dead-time on S3/S4 | 🟡 Pending |
+| 1-8 | Measure switching node voltages VSW1 & VSW2 waveforms | Screenshot of VSW1, VSW2, IL, Vout overlay | Confirm no ringing > 10% overshoot; add snubber if needed | 🟡 Pending |
+| 1-9 | Calculate power conversion efficiency manually from sim data | η = Pout/Pin recorded in notes | Pin = Avg(Vin × Iin), Pout = Vout² / Rload | 🟡 Pending |
+
+---
+
+### Phase 2 — Real MOSFET Models 🟡
+
+| # | Task | Deliverable | Notes / Formula | Status |
+|---|------|-------------|-----------------|--------|
+| 2-1 | Replace ideal switches with BSS138 (NMOS) for low-side (S2, S4) | BSS138 SPICE model downloaded and imported | BSS138: Vgs(th)=1.5V, Rds(on)=3.5 Ω at 4.5V gate | 🟡 Pending |
+| 2-2 | Replace S1, S3 with Si2302 (PMOS) for high-side | Si2302 SPICE model imported | P-FET: drive gate LOW to turn on; adjust PWM polarity | 🟡 Pending |
+| 2-3 | Add gate resistors Rg = 10 Ω to limit di/dt and ringing | Rg added on all 4 gate nets | Tune between 5–22 Ω; lower = faster switching but more ringing | 🟡 Pending |
+| 2-4 | Re-run buck transient and compare Vout, IL to ideal switch results | Overlay plot: ideal vs real FET waveforms saved | Expect slight Vout drop due to Rds(on) conduction losses | 🟡 Pending |
+| 2-5 | Measure gate charge waveform and estimate switching loss | `Psw = ½ × Vds × Id × (tr+tf) × Fsw` noted | Check if loss budget is below 10 mW at 100 mA load | 🟡 Pending |
+| 2-6 | Check body diode conduction during dead-time | Body diode current pulse visible on waveform | If duty > 5% of period, shorten dead-time or add Schottky across drain-source | 🟡 Pending |
+
+---
+
+### Phase 3 — Analog Control Loop Implementation 🟡
+
+| # | Task | Deliverable | Notes / Formula | Status |
+|---|------|-------------|-----------------|--------|
+| 3-1 | Build voltage reference block: Vref = 1.2V | Vref node at 1.2V verified | In SKY130 iteration this becomes a bandgap reference sub-block | 🟡 Pending |
+| 3-2 | Build feedback resistor divider: R1=175 kΩ, R2=100 kΩ | Vfb = Vout × R2/(R1+R2) ≈ 1.2V confirmed | Place 100 pF across R1 for noise filtering | 🟡 Pending |
+| 3-3 | Instantiate LTC6078 op-amp as error amplifier (behavioural) | Error amp sub-circuit placed in schematic | LTC6078: low offset (17 µV), rail-to-rail, 800 kHz GBW | 🟡 Pending |
+| 3-4 | Add Type-II compensation network around error amp (Cf, Cp, Rf) | Cf, Cp, Rf placed on error amp feedback path | `fz = 1/(2π×R1×Cf) ≈ f0/5 = 4.6 kHz; fp ≈ 200 kHz` | 🟡 Pending |
+| 3-5 | Build sawtooth ramp generator using B-source at 500 kHz | Vramp = V(t, 0V→1V) at 500 kHz verified | Use: `V=((time*500k)-floor(time*500k))*1.0` in B-source | 🟡 Pending |
+| 3-6 | Add PWM comparator: compare Verror vs Vramp | PWM output switching at correct duty cycle | Use LTC6752 comparator model or behavioural ECOMP in LTspice | 🟡 Pending |
+| 3-7 | Add mode selector logic: Buck / Boost / Buck-Boost signal routing | Mode gate driving logic completed | Buck if Vin>3.5V; Boost if Vin<3.1V; BB in between | 🟡 Pending |
+| 3-8 | Close the loop: connect PWM output to gate driver switches | Full closed-loop schematic assembled | Verify no floating nodes; check all return paths to GND | 🟡 Pending |
+| 3-9 | Run closed-loop transient: Vin=4.2V, load step 10→100 mA | Vout recovers to 3.3V ±2% within 20 µs | Measure: undershoot, overshoot, settling time | 🟡 Pending |
+| 3-10 | Run closed-loop transient: Vin=2.5V (Boost), same load step | Same settling criteria verified in Boost mode | Phase margin should be ≥ 45° — verify with AC analysis in Phase 4 | 🟡 Pending |
+
+---
+
+### Phase 4 — AC Analysis & Stability 🟡
+
+| # | Task | Deliverable | Notes / Formula | Status |
+|---|------|-------------|-----------------|--------|
+| 4-1 | Break the feedback loop and inject AC stimulus (loop-gain analysis) | Loop-gain T(s) = Vreturn / Vinject plotted | Use LTspice `.ac` sweep with 1Ω + 1H injection method at error amp output | 🟡 Pending |
+| 4-2 | Measure Phase Margin (PM) and Gain Margin (GM) | PM ≥ 45°, GM ≥ 10 dB confirmed for both modes | Adjust Cf/Cp if PM < 45°; increase Cf to move fz lower | 🟡 Pending |
+| 4-3 | Plot control-to-output Bode plot: Vout/Vcomp | Bode plot PNG saved with PM/GM annotated | LC double pole at f0 ≈ 23 kHz must be compensated | 🟡 Pending |
+| 4-4 | Verify crossover frequency fc ≈ Fsw/10 = 50 kHz | fc annotated on Bode plot | fc too low = slow transient; too high = noise susceptibility | 🟡 Pending |
+| 4-5 | Check PSRR: inject ripple on Vin, measure Vout ripple | PSRR plot (dB) over frequency saved | Target: > 40 dB PSRR at Fsw | 🟡 Pending |
+
+---
+
+### Phase 5 — Worst-Case Corners & Verification 🟡
+
+| # | Task | Deliverable | Notes / Formula | Status |
+|---|------|-------------|-----------------|--------|
+| 5-1 | Sweep Vin from 2.5V to 4.2V in 0.1V steps (.step param) | Vout vs Vin overlay plot — all within ±1% | Use `.step param Vin 2.5 4.2 0.1` in LTspice | 🟡 Pending |
+| 5-2 | Sweep Rload from 33 Ω (100 mA) to 1 kΩ (3.3 mA) at Vin=3.7V | Vout regulation vs load plot saved | Observe line/load regulation metrics | 🟡 Pending |
+| 5-3 | Verify mode transition: slowly ramp Vin 2.5→4.2V over 1 ms | Smooth Vout during mode transition confirmed | No Vout glitch > 5% during Buck↔Boost handoff | 🟡 Pending |
+| 5-4 | Measure output ripple at all 4 Vin corners | ΔVout ≤ 10 mV confirmed at all corners | If ESR spike causes ripple, add 2nd-order LC output filter | 🟡 Pending |
+| 5-5 | Run Monte Carlo on R1, R2 (1% tolerance): 100 runs | Vout histogram: mean=3.3V, σ < 10 mV | Use `.mc 100` or manual `.step` for LTspice XVII | 🟡 Pending |
+
+---
+
+### Phase 6 — Documentation & Portfolio 🟡
+
+| # | Task | Deliverable | Notes | Status |
+|---|------|-------------|-------|--------|
+| 6-1 | Write project README with specs, topology description, block diagram | README.md committed to GitHub | Include mode-transition logic explanation | 🟡 Pending |
+| 6-2 | Export all key waveforms as PNG (IL, Vout, VSW, Bode) | 8+ annotated waveform screenshots in /docs folder | Annotate PM, GM, ripple, settling time on each plot | 🟡 Pending |
+| 6-3 | Draw block-level architecture diagram (hand-drawn or draw.io) | Architecture PDF in /docs | Blocks: Power Stage, Error Amp, Ramp Gen, PWM Comp, Mode Selector, Gate Driver | 🟡 Pending |
+| 6-4 | Write simulation report (this document updated with results) | Final report with all tables filled in | Fill Status column; add measured values to Specs table | 🟡 Pending |
+| 6-5 | Prepare 5-minute project walkthrough for interview | Speaking notes: topology → hand-calcs → sim → results → next steps | Key talking points: why 4-switch, why 500 kHz, how control loop stabilised | 🟡 Pending |
+
+---
+
+## 4. Master Deliverables Checklist
+
+### Phase 1 — Open-Loop Power Stage
+- [ ] LTspice .asc schematic: 4-switch power stage with ideal switches
+- [ ] Transient waveform: IL, Vout, VSW1, VSW2 in Buck mode (Vin=4.2V)
+- [ ] Transient waveform: IL, Vout, VSW1, VSW2 in Boost mode (Vin=2.5V)
+- [ ] Hand-calc verification table: L, Cout, Cin, D for all Vin corners
+- [ ] Efficiency estimate: η = Pout/Pin from simulation
+
+### Phase 2 — Real MOSFETs
+- [ ] Imported SPICE models: BSS138 (NMOS), Si2302 (PMOS)
+- [ ] Gate resistors Rg = 10 Ω placed on all 4 switch gates
+- [ ] Overlay plot: ideal vs real FET Vout waveform comparison
+- [ ] Switching loss estimate: Psw noted for high-side and low-side FETs
+
+### Phase 3 — Closed-Loop Control
+- [ ] Feedback divider verified: Vfb = 1.2V at Vout = 3.3V
+- [ ] Type-II compensator placed: Cf, Cp, Rf calculated and set
+- [ ] Sawtooth ramp at 500 kHz verified on waveform viewer
+- [ ] PWM comparator output: correct duty cycle at all Vin corners
+- [ ] Mode selector logic: Buck / Boost / Buck-Boost routing verified
+- [ ] Closed-loop transient: load step 10→100 mA settled within 20 µs
+
+### Phase 4 — Stability (AC Analysis)
+- [ ] Loop-gain Bode plot: Phase Margin ≥ 45°, Gain Margin ≥ 10 dB
+- [ ] Control-to-output Bode plot (Vout/Vcomp) plotted and annotated
+- [ ] Crossover frequency fc ≈ 50 kHz confirmed on Bode plot
+- [ ] PSRR > 40 dB at Fsw verified
+
+### Phase 5 — Corners & Verification
+- [ ] Vin sweep 2.5→4.2V: Vout within ±1% across all corners
+- [ ] Load sweep 3.3→100 mA: Vout regulation plotted
+- [ ] Mode transition: no Vout glitch > 5% during Vin ramp
+- [ ] Output ripple ≤ 10 mV at all corners confirmed
+- [ ] Monte Carlo 100 runs on R1/R2: σ(Vout) < 10 mV
+
+### Phase 6 — Documentation
+- [ ] README.md with specs, topology, block diagram on GitHub
+- [ ] 8+ annotated waveform PNGs exported to /docs
+- [ ] Architecture block diagram (PDF or PNG)
+- [ ] Final simulation report fully updated
+- [ ] 5-minute interview walkthrough notes prepared
+
+---
+
+## 5. Interview Talking Points
+
+| Question | Key Answer Points |
+|----------|------------------|
+| Why a 4-switch non-inverting topology? | Single inductor handles both step-up and step-down. Non-inverting output avoids polarity inversion. Used in Li-ion PMIC designs (e.g. Qualcomm PM8150). |
+| How do you choose switching frequency? | 500 kHz balances inductor size (smaller at higher Fsw) vs switching losses (increase with Fsw). At 500 kHz, L = 47 µH — physically small but feasible. |
+| Why Type-II compensator? | Buck-Boost plant has a double LC pole (~23 kHz) requiring a compensator zero to boost phase. Type-II adds one zero and one HF pole — sufficient for this topology. |
+| How do you handle mode transitions? | Hysteresis comparator monitors Vin. Buck mode when Vin > 3.5V, Boost when Vin < 3.1V, overlap (all 4 switching) in 3.1–3.5V window. |
+| What limits efficiency in this design? | Conduction loss: Irms² × Rds(on). Switching loss: ½ × Vds × Id × (tr+tf) × Fsw. Gate charge loss: Qg × Vgs × Fsw. Inductor DCR loss: IL² × DCR. |
+| Why is phase margin important? | PM < 45° → underdamped closed-loop → Vout oscillations on transients. PM = 0° → instability. Target 45–70° for PMIC applications. |
+| How does the error amplifier connect to the Buck-Boost? | Error amp senses Vfb = Vout × R2/(R1+R2), compares to Vref = 1.2V, outputs Verror. Verror compared to Vramp by PWM comparator → duty cycle control. |
+| What is the significance of RHP zero in Boost mode? | Boost converter has a RHP zero at `fRHP = (1−D)²×Rl / (2π×L)`. It limits achievable crossover frequency. Must set fc < fRHP/3 for stable loop. |
+
+---
+
+## 6. Next Steps — Path to SKY130 ASIC
+
+| # | Milestone | Description | Tools |
+|---|-----------|-------------|-------|
+| 1 | LTspice Iteration 2 | Refine compensator; add soft-start, OCP, OVP protection | LTspice XVII |
+| 2 | Xschem Schematic Entry | Re-draw full mixed-signal schematic in Xschem with SKY130 PDK primitives | Xschem + SKY130 PDK |
+| 3 | Replace Error Amp | Swap LTC6078 behavioral model with your SPI-trimmed 2-stage CMOS OTA (SKY130) | Ngspice / Spectre |
+| 4 | Mixed-Signal Simulation | Co-simulate digital mode-selector + analog control loop | Ngspice + Verilog-A |
+| 5 | Pre-Layout Simulation | Full parasitic-free sim before physical design | Ngspice |
+| 6 | Physical Layout | Place & route in Magic VLSI; follow SKY130 DRC rules | Magic VLSI + KLayout |
+| 7 | PEX + Post-Layout Sim | Extract parasitics, re-simulate, verify spec compliance | Magic + Ngspice |
+
+---
+
+## 7. Simulation Results Log
+
+> Fill in the table below as you complete each simulation phase.
+
+| Metric | Target | Simulated | Pass? |
+|--------|--------|-----------|-------|
+| Vout (nominal) | 3.30V ± 1% | — | — |
+| Output ripple ΔVout | ≤ 10 mV | — | — |
+| Inductor ripple ΔIL | ≤ 30 mA (30% of Iload) | — | — |
+| Phase Margin (Buck) | ≥ 45° | — | — |
+| Phase Margin (Boost) | ≥ 45° | — | — |
+| Gain Margin | ≥ 10 dB | — | — |
+| Crossover Frequency fc | ≈ 50 kHz | — | — |
+| Load transient settling | ≤ 20 µs (10→100 mA step) | — | — |
+| Vout undershoot (load step) | ≤ 5% of 3.3V = 165 mV | — | — |
+| Efficiency η (Buck, full load) | ≥ 85% | — | — |
+| Efficiency η (Boost, full load) | ≥ 80% | — | — |
+| PSRR at 500 kHz | ≥ 40 dB | — | — |
+
+---
+
+*Document Version: 1.0 | Project: 4-Switch Non-Inverting Buck-Boost (LTspice Iter. 1) | Process: SKY130 (Phase 2+)*
